@@ -11,15 +11,15 @@ if __name__ == "__main__":
     tokens = tokens[None, :]  # (1, seq_len)
 
     vocab_size = tokenizer.vocab_size
-    d_model = 16
+    embed_dim = 16
     max_len = 50
 
-    model = InputEmbedding(vocab_size, d_model, max_len)
+    model = InputEmbedding(vocab_size, embed_dim, max_len)
 
     # forward
     out = model.forward(tokens)
 
-    print("Output shape:", out.shape)  # (1, seq_len, d_model)
+    print("Output shape:", out.shape)  # (1, seq_len, embed_dim)
 
     # fake gradient
     d_out = np.random.randn(*out.shape)

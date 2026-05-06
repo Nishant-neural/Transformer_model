@@ -3,12 +3,12 @@ import numpy as np
 class CharTokenizer:
     def __init__(self, text):
         chars = sorted(list(set(text)))
-        self.stoi = {ch: i for i, ch in enumerate(chars)}
-        self.itos = {i: ch for ch, i in self.stoi.items()}
+        self.str_to_i = {ch: i for i, ch in enumerate(chars)}
+        self.i_to_str = {i: ch for ch, i in self.str_to_i.items()}
         self.vocab_size = len(chars)
 
     def encode(self, s):
-        return np.array([self.stoi[c] for c in s], dtype=np.int32)
+        return np.array([self.str_to_i[c] for c in s], dtype=np.int32)
 
     def decode(self, indices):
-        return ''.join([self.itos[int(i)] for i in indices])
+        return ''.join([self.i_to_str[int(i)] for i in indices])
