@@ -21,7 +21,7 @@ class InputEmbedding:
         self.PE = positional_encoding(max_len, embed_dim)
 
     def forward(self, x):
-       
+       # x: batch , seq_len
         emb = self.embedding.forward(x)
         
         seq_len = x.shape[1]
