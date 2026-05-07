@@ -1,6 +1,6 @@
 import numpy as np
 
-def softmax(x):
+def softmax_forward(x):
 
  #   x: (..., seq_len)
 
