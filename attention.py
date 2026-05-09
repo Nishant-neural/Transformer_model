@@ -19,7 +19,9 @@ class Query_key:
 
     def forward(self):
         batch, seq_len_q, d_k =  self.Q.shape
-        self.score = (self.Q @ self.K.T) / np.sqrt(seq_len_q)
+        self.scores = self.Q @ self.K.transpose(0, 2, 1)
+        self.scores = self.scores / np.sqrt(d_k)
+
         self.score =  softmax_forward(self.score)
 
 
