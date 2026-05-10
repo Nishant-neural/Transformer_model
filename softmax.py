@@ -12,8 +12,8 @@ def softmax_forward(x):
 
 def softmax_backward(d_out, softmax_out):
    
-   #   d_out: gradient wrt softmax output
-   #  softmax_out: output of softmax
+   #   d_out: gradient wrt softmax output meaning dweights
+   #  softmax_out: output of softmax meaning weights
    #  shape: (..., seq_len)
    
     temp = np.sum(d_out * softmax_out, axis=-1, keepdims=True)

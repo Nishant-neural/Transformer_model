@@ -1,5 +1,5 @@
 import numpy as np
-from softmax import softmax_forward
+from softmax import softmax_forward , softmax_backward
 
 class ScaledDotProductAttention:
     def __init__ (self , embed_dim , d_k , d_v) :
@@ -30,16 +30,17 @@ class ScaledDotProductAttention:
         self.Q = X_Q @ self.WQ
 
         batch, seq_len_q, d_k =  self.Q.shape
-        self.logits = self.Q @ self.K.transpose(0, 2, 1)
-        self.logits = self.logits / np.sqrt(d_k)
+        self.scores = self.Q @ self.K.transpose(0, 2, 1)
+        self.scores = self.scores / np.sqrt(d_k)
 
         if mask is not None:
-           self.logits = np.where(mask, self.logits, -1e9)
+           self.scores = np.where(mask, self.scores, -1e9)
 
-        self.weights =  softmax_forward(self.logits)
+        self.weights =  softmax_forward(self.scores)
         self.out = self.weights @ self.V
 
-
+        # weights = batch , seq_lenq , seq_len_k
+        # Out = batch , seq_len_q , d_v
         return self.out, self.weights
 
 
@@ -55,3 +56,14 @@ class ScaledDotProductAttention:
     def padding_mask(tokens, pad_id=0):
         return (tokens != pad_id)[:, None, :]
 
+     
+    def backward(self , d_out):
+        batch, seq_len_q, d_k =  self.Q.shape
+
+        self.dV =  self.weights.transpose(0,2,1)  @ d_out
+
+        self.dweights = d_out @ self.V.transpose(0,2,1)
+
+        self.dscaled =  softmax_backward(self.dweights , self.weights  )
+       
+        self.dscores = self.dscaled / np.sqrt(d_k)
