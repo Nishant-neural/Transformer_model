@@ -57,13 +57,28 @@ class ScaledDotProductAttention:
         return (tokens != pad_id)[:, None, :]
 
      
-    def backward(self , d_out):
+    def backward(self , d_out ,X_Q, X_K, X_V):
         batch, seq_len_q, d_k =  self.Q.shape
 
         self.dV =  self.weights.transpose(0,2,1)  @ d_out
 
         self.dweights = d_out @ self.V.transpose(0,2,1)
 
-        self.dscaled =  softmax_backward(self.dweights , self.weights  )
-       
+        self.dscaled =  softmax_backward(self.dweights , self.weights)
+
+       # weights = softmax(scores)
+       # scores = scores/ scaling factor
+        # scores = Q @K.T
+
         self.dscores = self.dscaled / np.sqrt(d_k)
+        self.dQ = self.dscores @ self.K
+        self.dk = self.dscores.transpose(0,2,1) @ self.Q
+
+        self.dWQ = X_Q.transpose(0,2,1) @ self.dQ
+        self.dX_Q = self.dQ @ self.WQ.T
+
+        self.dWK = X_K.transpose(0,2,1) @ self.dK
+        self.dX_K = self.dK @ self.WK.T
+
+        self.dWV = X_V.transpose(0,2,1) @ self.dV
+        self.dX_V = self.dV @ self.WV.T
