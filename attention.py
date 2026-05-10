@@ -1,4 +1,3 @@
-from embeddings import Embedding
 import numpy as np
 from softmax import softmax_forward
 
@@ -20,22 +19,39 @@ class ScaledDotProductAttention:
        
 
 
-    def forward(self, X_Q , X_K , mask = None):
+    def forward(self, X_Q, X_K, X_V, mask=None):
 
         # X_q =  batch , seq_len_q , embed_dim
         # X_K = batch , seq_len_k , embed_dim
+        # X_V = BATCH , seq_len_k , embed_dim
+
         self.K = X_K @ self.WK
-        self.V = X_K @self.WV
+        self.V = X_V @ self.WV
         self.Q = X_Q @ self.WQ
 
         batch, seq_len_q, d_k =  self.Q.shape
-        self.scores = self.Q @ self.K.transpose(0, 2, 1)
-        self.scores = self.scores / np.sqrt(d_k)
+        self.logits = self.Q @ self.K.transpose(0, 2, 1)
+        self.logits = self.logits / np.sqrt(d_k)
 
         if mask is not None:
-            scores = np.where(mask, scores, -1e9)
+           self.logits = np.where(mask, self.logits, -1e9)
 
-        self.scores =  softmax_forward(self.scores)
-        self.attention = self.scores @ self.V
+        self.weights =  softmax_forward(self.logits)
+        self.out = self.weights @ self.V
 
+
+        return self.out, self.weights
+
+
+    @staticmethod
+    def causal_mask(seq_len_q, seq_len_k=None):
+        if seq_len_k is None:
+            seq_len_k = seq_len_q
+
+        mask = np.tril(np.ones((seq_len_q, seq_len_k), dtype=bool))
+        return mask[None, :, :]
+
+    @staticmethod
+    def padding_mask(tokens, pad_id=0):
+        return (tokens != pad_id)[:, None, :]
 
