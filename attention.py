@@ -24,6 +24,10 @@ class ScaledDotProductAttention:
         # X_q =  batch , seq_len_q , embed_dim
         # X_K = batch , seq_len_k , embed_dim
         # X_V = BATCH , seq_len_k , embed_dim
+        self.X_Q = X_Q
+        self.X_K = X_K
+        self.X_V = X_V
+        self.mask = mask
 
         self.K = X_K @ self.WK
         self.V = X_V @ self.WV
@@ -57,7 +61,7 @@ class ScaledDotProductAttention:
         return (tokens != pad_id)[:, None, :]
 
      
-    def backward(self , d_out ,X_Q, X_K, X_V):
+    def backward(self , d_out ):
         batch, seq_len_q, d_k =  self.Q.shape
 
         self.dV =  self.weights.transpose(0,2,1)  @ d_out
@@ -65,6 +69,8 @@ class ScaledDotProductAttention:
         self.dweights = d_out @ self.V.transpose(0,2,1)
 
         self.dscaled =  softmax_backward(self.dweights , self.weights)
+        if self.mask is not None:
+            self.dscaled = np.where(self.mask, self.dscaled, 0)
 
        # weights = softmax(scores)
        # scores = scores/ scaling factor
@@ -72,13 +78,24 @@ class ScaledDotProductAttention:
 
         self.dscores = self.dscaled / np.sqrt(d_k)
         self.dQ = self.dscores @ self.K
-        self.dk = self.dscores.transpose(0,2,1) @ self.Q
+        self.dK = self.dscores.transpose(0,2,1) @ self.Q
 
-        self.dWQ = X_Q.transpose(0,2,1) @ self.dQ
+        self.dWQ = np.sum(
+        self.X_Q.transpose(0,2,1) @ self.dQ,
+        axis=0
+        )
         self.dX_Q = self.dQ @ self.WQ.T
 
-        self.dWK = X_K.transpose(0,2,1) @ self.dK
+        self.dWK = np.sum(
+        self.X_K.transpose(0,2,1) @ self.dK,
+        axis=0
+        )
         self.dX_K = self.dK @ self.WK.T
 
-        self.dWV = X_V.transpose(0,2,1) @ self.dV
+        self.dWV = np.sum(
+        self.X_V.transpose(0,2,1) @ self.dV,
+        axis=0
+        )
         self.dX_V = self.dV @ self.WV.T
+
+        return self.dX_Q, self.dX_K, self.dX_V
