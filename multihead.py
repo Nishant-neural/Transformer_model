@@ -38,31 +38,4 @@ class MultiHeadAttention :
 
         return self.out, self.attention_weights
 
-    def backward(self, d_out):
-        self.dWO = np.sum(
-            self.concat.transpose(0, 2, 1) @ d_out,
-            axis=0
-        )
-
-        d_concat = d_out @ self.WO.T
-        d_head_outputs = np.split(d_concat, self.num_heads, axis=-1)
-
-        dX_Q = np.zeros_like(self.X_Q)
-        dX_K = np.zeros_like(self.X_K)
-        dX_V = np.zeros_like(self.X_V)
-
-        for head, d_head_out in zip(self.heads, d_head_outputs):
-            d_head_Q, d_head_K, d_head_V = head.backward(d_head_out)
-            dX_Q += d_head_Q
-            dX_K += d_head_K
-            dX_V += d_head_V
-
-        return dX_Q, dX_K, dX_V
-
-    def step(self, lr):
-        for head in self.heads:
-            head.WQ -= lr * head.dWQ
-            head.WK -= lr * head.dWK
-            head.WV -= lr * head.dWV
-
-        self.WO -= lr * self.dWO
+   
