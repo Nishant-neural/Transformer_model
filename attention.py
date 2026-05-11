@@ -34,7 +34,8 @@ class ScaledDotProductAttention:
         self.Q = X_Q @ self.WQ
 
         batch, seq_len_q, d_k =  self.Q.shape
-        self.scores = self.Q @ self.K.transpose(0, 2, 1)
+        self.scores = self.Q @  np.swapaxes(self.K, -1, -2)
+
         self.scores = self.scores / np.sqrt(d_k)
 
         if mask is not None:
@@ -99,3 +100,20 @@ class ScaledDotProductAttention:
         self.dX_V = self.dV @ self.WV.T
 
         return self.dX_Q, self.dX_K, self.dX_V
+
+
+    def scaled_dot_product_attention(Q, K, V, mask=None):
+        d_k = Q.shape[-1]
+
+        scores = Q @ np.swapaxes(K, -1, -2)
+        scores = scores / np.sqrt(d_k)
+
+        if mask is not None:
+            if mask.ndim == 3:
+                mask = mask[:, None, :, :]  # (B, 1, Tq, Tk)
+            scores = np.where(mask, scores, -1e9)
+
+        weights = softmax_forward(scores)
+        out = weights @ V
+
+        return out, weights
