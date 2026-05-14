@@ -12,15 +12,17 @@ class MultiHeadAttention :
         self.d_k = embed_dim // num_heads
         self.d_v =  embed_dim // num_heads
 
-        self.WQ = np.random.randn(num_heads, embed_dim, self.d_k) / np.sqrt(embed_dim)
-        self.WK = np.random.randn(num_heads, embed_dim, self.d_k) / np.sqrt(embed_dim)
-        self.WV = np.random.randn(num_heads, embed_dim, self.d_v) / np.sqrt(embed_dim)
+        self.WQ = np.random.randn(embed_dim, embed_dim) / np.sqrt(embed_dim)
+        self.WK = np.random.randn(embed_dim, embed_dim) / np.sqrt(embed_dim)
+        self.WV = np.random.randn(embed_dim, embed_dim) / np.sqrt(embed_dim)
 
          # out = weights @v for one head batch ,seq_len , d_v 
          #  out(concatenated) =  batch , seq len , embed-dim
 
         self.WO = np.random.randn(embed_dim, embed_dim) / np.sqrt(embed_dim)
         self.dWO = np.zeros_like(self.WO)
+        
+        self.att = ScaledDotProductAttention()
 
     def forward(self, X_Q, X_K, X_V, mask=None):
     # X_Q: (B, Tq, E) T = seq_len  E = embed_dim
@@ -30,13 +32,19 @@ class MultiHeadAttention :
         self.X_K = X_K
         self.X_V = X_V
 
-        self.Q = np.einsum("bte,hed->bhtd", X_Q, self.WQ)
-        self.K = np.einsum("bte,hed->bhtd", X_K, self.WK)
-        self.V = np.einsum("bte,hed->bhtd", X_V, self.WV)
+        B, Tq, E = X_Q.shape
+        _, Tk, _ = X_K.shape
+
+        self.Q_proj = X_Q @ self.WQ
+        self.K_proj = X_K @ self.WK
+        self.V_proj = X_V @ self.WV
+
+        self.Q = self.Q_proj.reshape(B, Tq, self.num_heads, self.d_k).transpose(0, 2, 1, 3)
+        self.K = self.K_proj.reshape(B, Tk, self.num_heads, self.d_k).transpose(0, 2, 1, 3)
+        self.V = self.V_proj.reshape(B, Tk, self.num_heads, self.d_v).transpose(0, 2, 1, 3)
 
     # Q, K, V are now:   (B, H, T, D)
    
-        self.att = ScaledDotProductAttention()
         self.head_out, self.weights = self.att.forward(self.Q, self.K, self.V, mask)
 
     # head_out: (B, H, Tq, d_v)
@@ -74,16 +82,19 @@ class MultiHeadAttention :
 
          # Q, K, V are now:   (B, H, T, D)
          # X_Q: (B, Tq, E) T = seq_len  E = embed_dim
-         # (num_heads, embed_dim, self.d_k = WQ
+         # (embed_dim, embed_dim) = WQ
 
-        self.dWQ = np.einsum("bte,bhtd->hed", self.X_Q, self.dQ)
-        self.dWK = np.einsum("bte,bhtd->hed", self.X_K, self.dK)
-        self.dWV = np.einsum("bte,bhtd->hed", self.X_V, self.dV)
+        self.dQ_proj = self.dQ.transpose(0, 2, 1, 3).reshape(self.X_Q.shape[0], self.X_Q.shape[1], self.embed_dim)
+        self.dK_proj = self.dK.transpose(0, 2, 1, 3).reshape(self.X_K.shape[0], self.X_K.shape[1], self.embed_dim)
+        self.dV_proj = self.dV.transpose(0, 2, 1, 3).reshape(self.X_V.shape[0], self.X_V.shape[1], self.embed_dim)
 
-        self.dX_Q = np.einsum("bhtd,hed->bte", self.dQ, self.WQ)
-        self.dX_K = np.einsum("bhtd,hed->bte", self.dK, self.WK)
-        self.dX_V = np.einsum("bhtd,hed->bte", self.dV, self.WV)
+        self.dWQ = np.einsum("bte,btf->ef", self.X_Q, self.dQ_proj)
+        self.dWK = np.einsum("bte,btf->ef", self.X_K, self.dK_proj)
+        self.dWV = np.einsum("bte,btf->ef", self.X_V, self.dV_proj)
+
+        self.dX_Q = self.dQ_proj @ self.WQ.T
+        self.dX_K = self.dK_proj @ self.WK.T
+        self.dX_V = self.dV_proj @ self.WV.T
 
         return self.dX_Q, self.dX_K, self.dX_V
        
-
