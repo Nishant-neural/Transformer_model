@@ -32,12 +32,8 @@ class LayerNorm:
         dx_norm = d_out * self.gamma
         dim = self.embed_dim
 
-        dx = (
-            (1.0 / dim)
-            * self.std_inv
-            * (
-                dim * dx_norm
-                - np.sum(dx_norm, axis=-1, keepdims=True)
+        dx = ((1.0 / dim) * self.std_inv * (
+                dim * dx_norm - np.sum(dx_norm, axis=-1, keepdims=True)
                 - self.x_norm * np.sum(dx_norm * self.x_norm, axis=-1, keepdims=True)
             )
         )
