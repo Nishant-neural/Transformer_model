@@ -1,4 +1,5 @@
 import numpy as np
+from activations import activation_backward, activation_forward
 
 
 class FeedForward:
@@ -24,7 +25,7 @@ class FeedForward:
 
         self.x = x
         self.z1 = x @ self.W1 + self.b1
-        self.a1 = self._activation_forward(self.z1)
+        self.a1 = activation_forward(self.z1, self.activation)
         self.out = self.a1 @ self.W2 + self.b2
 
         return self.out
@@ -38,7 +39,7 @@ class FeedForward:
         self.db2 = np.sum(d_out, axis=(0, 1))
 
         da1 = d_out @ self.W2.T
-        dz1 = da1 * self._activation_backward(self.z1)
+        dz1 = da1 * activation_backward(self.z1, self.activation)
 
         self.dW1 = np.einsum("bte,bth->eh", self.x, dz1)
         self.db1 = np.sum(dz1, axis=(0, 1))
@@ -51,25 +52,5 @@ class FeedForward:
         self.b1 -= lr * self.db1
         self.W2 -= lr * self.dW2
         self.b2 -= lr * self.db2
-
-    def _activation_forward(self, x):
-        if self.activation == "relu":
-            return np.maximum(0, x)
-        if self.activation == "gelu":
-            return 0.5 * x * (1.0 + np.tanh(np.sqrt(2.0 / np.pi) * (x + 0.044715 * x**3)))
-
-        raise ValueError("activation must be 'relu' or 'gelu'")
-
-    def _activation_backward(self, x):
-        if self.activation == "relu":
-            return (x > 0).astype(x.dtype)
-        if self.activation == "gelu":
-            tanh_arg = np.sqrt(2.0 / np.pi) * (x + 0.044715 * x**3)
-            tanh_val = np.tanh(tanh_arg)
-            sech2 = 1.0 - tanh_val**2
-            inner_grad = np.sqrt(2.0 / np.pi) * (1.0 + 3.0 * 0.044715 * x**2)
-            return 0.5 * (1.0 + tanh_val) + 0.5 * x * sech2 * inner_grad
-
-        raise ValueError("activation must be 'relu' or 'gelu'")
 
   
