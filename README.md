@@ -1,116 +1,158 @@
 # Transformer Model From Scratch
 
-A small learning project that builds transformer components with NumPy. The code currently covers character tokenization, token embeddings, sinusoidal positional encodings, softmax forward/backward passes, and an early attention score implementation.
+A small educational implementation of transformer building blocks using only
+Python and NumPy.
 
-The goal of this repository is to make each transformer building block easy to inspect and understand before combining them into a larger model.
+This project is meant for learning how the pieces of a transformer work under
+the hood. The code favors readable, inspectable implementations over framework
+abstractions, so each module can be opened and studied on its own.
+
+## What Is Included
+
+- Character-level tokenization
+- Trainable token embeddings
+- Sinusoidal positional encodings
+- Numerically stable softmax with backward pass
+- Scaled dot-product attention with optional causal and padding masks
+- Multi-head attention with forward and backward passes
+- Feed-forward network with ReLU or GELU activation
+- Layer normalization with trainable scale and bias
+- Simple smoke test for embedding forward/backward/update flow
 
 ## Project Structure
 
-| File | Description |
+| File | Purpose |
 | --- | --- |
-| `tokenizer.py` | Character-level tokenizer with `encode` and `decode` methods. |
-| `embeddings.py` | Trainable embedding layer with forward, backward, and update steps. |
-| `pos_encoding.py` | Sinusoidal positional encoding and an `InputEmbedding` wrapper. |
-| `softmax.py` | Numerically stable softmax and softmax backward function. |
-| `attention.py` | Query/key projection and attention score calculation work in progress. |
-| `test.py` | Simple smoke test for tokenization, input embeddings, backward pass, and parameter update. |
+| `tokenizer.py` | Character tokenizer with `encode` and `decode` methods. |
+| `embeddings.py` | Trainable embedding lookup table with manual gradient updates. |
+| `pos_encoding.py` | Sinusoidal positional encoding and input embedding wrapper. |
+| `softmax.py` | Softmax forward pass and Jacobian-vector backward pass. |
+| `attention.py` | Scaled dot-product attention, masking helpers, and backward pass. |
+| `multihead.py` | Multi-head attention built on scaled dot-product attention. |
+| `feedfoward.py` | Transformer-style feed-forward block. |
+| `activations.py` | ReLU and GELU activation functions and derivatives. |
+| `layerNorm.py` | Layer normalization implementation with backward pass. |
+| `test.py` | Minimal smoke test for tokenization and input embeddings. |
 
-## How to Run
+## Requirements
 
-### Running the Test
-Execute the test script to verify all components work together:
+- Python 3.10+
+- NumPy
+
+Install NumPy if it is not already available:
+
+```bash
+pip install numpy
+```
+
+## Quick Start
+
+Run the included smoke test:
 
 ```bash
 python test.py
 ```
 
-This will:
-- Create a character tokenizer from "hello world"
-- Encode the text into tokens
-- Create input embeddings with positional encoding
-- Run a forward pass
-- Simulate a backward pass with random gradients
-- Update the model parameters
-- Print success confirmation
-
 Expected output:
-```
+
+```text
 Output shape: (1, 11, 16)
 Backward pass successful
 ```
 
-### Interactive Usage
-You can experiment with the components in a Python REPL:
+The test script:
+
+1. Builds a character vocabulary from `hello world`.
+2. Encodes text into token IDs.
+3. Creates token embeddings with positional encodings.
+4. Runs a forward pass.
+5. Sends a random gradient through the embedding layer.
+6. Updates the embedding weights.
+
+## Example Usage
 
 ```python
 import numpy as np
+
 from tokenizer import CharTokenizer
 from pos_encoding import InputEmbedding
-from attention import Query_key
+from multihead import MultiHeadAttention
 
-# Tokenize text
 text = "hello transformer"
-tokenizer = CharTokenizer(text)
-tokens = tokenizer.encode(text)[None, :]  # Shape: (1, seq_len)
-
-# Create embeddings
-model = InputEmbedding(tokenizer.vocab_size, embed_dim=32, max_len=50)
-embeddings = model.forward(tokens)  # Shape: (1, seq_len, embed_dim)
-
-# Test attention (work in progress)
-attention = Query_key(embeddings, embeddings, d_k=32)
-attention.forward()
-print(f"Attention scores shape: {attention.score.shape}")
-```
-
-```python
-from tokenizer import CharTokenizer
-from pos_encoding import InputEmbedding
-
-text = "hello world"
 
 tokenizer = CharTokenizer(text)
-tokens = tokenizer.encode(text)[None, :]
+tokens = tokenizer.encode(text)[None, :]  # (batch, seq_len)
 
+embed_dim = 16
 model = InputEmbedding(
     vocab_size=tokenizer.vocab_size,
-    embed_dim=16,
-    max_len=50,
+    embed_dim=embed_dim,
+    max_len=64,
 )
 
-out = model.forward(tokens)
-print(out.shape)
+x = model.forward(tokens)  # (batch, seq_len, embed_dim)
+
+attention = MultiHeadAttention(embed_dim=embed_dim, num_heads=4)
+out, weights = attention.forward(x, x, x)
+
+print(out.shape)      # (1, seq_len, embed_dim)
+print(weights.shape)  # (1, num_heads, seq_len, seq_len)
 ```
 
-## Current Features
+## Attention Masks
 
-- Character-level vocabulary creation from input text
-- Encoding text into integer token IDs
-- Decoding token IDs back into text
-- Trainable embedding lookup table
-- Sinusoidal positional encodings
-- Input embedding layer that combines token and position information
-- Softmax forward and backward functions
-- Basic gradient accumulation for embedding weights
-- Query-Key attention mechanism (work in progress)
+`ScaledDotProductAttention` includes helpers for common transformer masks:
 
-## How Components Work
+```python
+from attention import ScaledDotProductAttention
 
-### Tokenization
-The `CharTokenizer` creates a vocabulary by sorting unique characters from the input text. Each character gets a unique integer ID, allowing text to be converted to sequences of integers.
+causal_mask = ScaledDotProductAttention.causal_mask(seq_len_q=8)
+padding_mask = ScaledDotProductAttention.padding_mask(tokens, pad_id=0)
+```
 
-### Embeddings
-The `Embedding` class maintains a lookup table of shape `(vocab_size, embed_dim)`. During forward pass, it retrieves vectors for each token ID. The backward pass accumulates gradients for each token occurrence.
+Masks use `True` for positions that attention is allowed to see and `False` for
+positions that should be blocked.
 
-### Positional Encoding
-Uses sinusoidal functions to encode position information:
-- Even indices: `sin(pos / 10000^(i/embed_dim))`
-- Odd indices: `cos(pos / 10000^(i/embed_dim))`
-This allows the model to distinguish token positions.
+## Learning Notes
 
-### Attention Mechanism
-The `Query_key` class implements the core attention computation:
-- Projects input embeddings to Query and Key matrices
-- Computes attention scores as `Q @ K.T / sqrt(seq_len)`
-- Applies softmax to get attention weights
-(Note: Value projection and weighted sum not yet implemented)
+This repository implements gradients manually instead of using an automatic
+differentiation library. That makes it easier to inspect the math behind each
+operation:
+
+- `Embedding.backward` accumulates gradients for repeated token IDs.
+- `softmax_backward` computes the gradient through the softmax output.
+- `ScaledDotProductAttention.backward` propagates gradients to `Q`, `K`, and `V`.
+- `MultiHeadAttention.backward` reshapes head gradients and computes projection
+  weight gradients.
+- `LayerNorm.backward` follows the standard layer normalization derivative.
+
+## Current Limitations
+
+This is not yet a complete trainable transformer model. It does not include:
+
+- A full encoder or decoder block
+- Residual connections around attention and feed-forward layers
+- A language-model head
+- Loss functions
+- Dataset loading
+- A full training loop
+- Optimizers beyond simple SGD-style `step` methods
+
+There are also a few naming inconsistencies kept as-is for now, such as
+`feedfoward.py` and `layerNorm.py`.
+
+## Suggested Next Steps
+
+Good next improvements would be:
+
+1. Add a `TransformerBlock` that combines multi-head attention, residual
+   connections, layer normalization, and the feed-forward network.
+2. Add a cross-entropy loss implementation.
+3. Add a tiny training loop for character-level language modeling.
+4. Add numerical gradient checks for the backward passes.
+5. Add unit tests for masks, attention shapes, and layer normalization.
+
+## License
+
+No license file is currently included. Add one before publishing or reusing this
+project outside personal learning.
