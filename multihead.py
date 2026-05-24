@@ -97,4 +97,10 @@ class MultiHeadAttention :
         self.dX_V = self.dV_proj @ self.WV.T
 
         return self.dX_Q, self.dX_K, self.dX_V
+
+    def step(self, lr=1e-3):
+        self.WQ -= lr * self.dWQ
+        self.WK -= lr * self.dWK
+        self.WV -= lr * self.dWV
+        self.WO -= lr * self.dWO
        
