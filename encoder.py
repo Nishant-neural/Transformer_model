@@ -30,3 +30,40 @@ class EncoderBlock:
         )
 
         return self.out, self.attention_weights
+
+    def backward(self, d_out):
+
+        # d_out: (batch, seq_len, embed_dim)
+
+        if d_out.shape[-1] != self.embed_dim:
+            raise ValueError("last dimension of d_out must match embed_dim")
+
+        d_after_attention_residual, d_feed_forward_out = (
+            self.feed_forward_residual.backward(d_out)
+        )
+
+        d_after_attention_feed_forward = self.feed_forward.backward(
+            d_feed_forward_out
+        )
+        d_after_attention = (
+            d_after_attention_residual + d_after_attention_feed_forward
+        )
+
+        d_x_residual, d_attention_out = self.attention_residual.backward(
+            d_after_attention
+        )
+
+        d_x_query, d_x_key, d_x_value = self.self_attention.backward(
+            d_attention_out
+        )
+
+        # Self-attention used the same input as query, key, and value.
+        d_x = d_x_residual + d_x_query + d_x_key + d_x_value
+
+        return d_x
+
+    def step(self, lr=1e-3):
+        self.self_attention.step(lr)
+        self.feed_forward.step(lr)
+        self.attention_residual.step(lr)
+        self.feed_forward_residual.step(lr)
